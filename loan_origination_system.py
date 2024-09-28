@@ -15,9 +15,14 @@ def save_customer_data(customer_data):
     return customer_id
 
 # Function to insert document data into MongoDB
-def save_document_data(document_data):
-    document_id = documents_collection.insert_one(document_data).inserted_id
-    return document_id
+def save_document(customer_id, document_type, file):
+    document_data = {
+        "customer_id": customer_id,
+        "document_type": document_type,
+        "document_path": file.name,
+        "uploaded_at": datetime.datetime.now()
+    }
+    documents_collection.insert_one(document_data)
 
 # Function to insert loan data into MongoDB
 def save_loan_data(loan_data):
@@ -54,13 +59,9 @@ if submit_button:
         "created_at": datetime.datetime.now()
     }
     
-    # Insert the customer data into MongoDB and get the customer_id
     customer_id = save_customer_data(customer_data)
-    
-    # Store customer data and customer_id in session state
     st.session_state['customer_data'] = customer_data
     st.session_state['customer_id'] = customer_id
-    
     st.success("Customer information saved. Proceed to document upload.")
 
 # Step 2: Document Collection
@@ -72,57 +73,22 @@ if 'customer_id' in st.session_state:
         bank_statements = st.file_uploader("Upload Bank Statements (6 months)", type=['pdf', 'jpg', 'png'], accept_multiple_files=True)
         itr_documents = st.file_uploader("Upload Income Tax Returns (2 years)", type=['pdf', 'jpg', 'png'], accept_multiple_files=True)
         
-        # Access customer data from session state
-        customer_data = st.session_state['customer_data']
-        
-        # Check if GST status is true
-        gst_documents = None
-        if customer_data['gst_status']:
-            gst_documents = st.file_uploader("Upload GST Returns (2 years)", type=['pdf', 'jpg', 'png'], accept_multiple_files=True)
+        gst_documents = st.file_uploader("Upload GST Returns (2 years)", type=['pdf', 'jpg', 'png'], accept_multiple_files=True) if st.session_state['customer_data']['gst_status'] else None
         
         submit_documents_button = st.form_submit_button(label="Submit Documents")
 
     if submit_documents_button:
-        # Save documents into MongoDB, linking them to customer_id
         if business_registration_proof:
-            document_data = {
-                "customer_id": st.session_state['customer_id'],
-                "document_type": "Business Registration",
-                "document_path": business_registration_proof.name,
-                "uploaded_at": datetime.datetime.now()
-            }
-            save_document_data(document_data)
-        
+            save_document(st.session_state['customer_id'], "Business Registration", business_registration_proof)
         if bank_statements:
             for statement in bank_statements:
-                document_data = {
-                    "customer_id": st.session_state['customer_id'],
-                    "document_type": "Bank Statement",
-                    "document_path": statement.name,
-                    "uploaded_at": datetime.datetime.now()
-                }
-                save_document_data(document_data)
-        
+                save_document(st.session_state['customer_id'], "Bank Statement", statement)
         if itr_documents:
             for itr in itr_documents:
-                document_data = {
-                    "customer_id": st.session_state['customer_id'],
-                    "document_type": "Income Tax Return",
-                    "document_path": itr.name,
-                    "uploaded_at": datetime.datetime.now()
-                }
-                save_document_data(document_data)
-        
+                save_document(st.session_state['customer_id'], "Income Tax Return", itr)
         if gst_documents:
             for gst in gst_documents:
-                document_data = {
-                    "customer_id": st.session_state['customer_id'],
-                    "document_type": "GST Return",
-                    "document_path": gst.name,
-                    "uploaded_at": datetime.datetime.now()
-                }
-                save_document_data(document_data)
-
+                save_document(st.session_state['customer_id'], "GST Return", gst)
         st.success("Documents uploaded successfully. Proceed to loan application.")
 
 # Step 3: Loan Application
@@ -143,7 +109,5 @@ if 'customer_id' in st.session_state:
             "application_date": datetime.datetime.now(),
             "status": "Submitted"
         }
-        
-        # Save loan application data into MongoDB
         save_loan_data(loan_data)
         st.success("Loan application submitted successfully.")
